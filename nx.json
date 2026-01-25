@@ -13,10 +13,18 @@
       "!{projectRoot}/jest.config.ts"
     ]
   },
-  "plugins": [],
+  "plugins": [
+    {
+      "plugin": "@nx/eslint/plugin",
+      "options": {
+        "targetName": "eslint:lint"
+      }
+    }
+  ],
   "release": {
     "projects": [
-      "@tech-leads-club/agent-skills"
+      "@tech-leads-club/agent-skills",
+      "core"
     ],
     "version": {
       "conventionalCommits": true,
@@ -61,10 +69,20 @@
         "^production"
       ]
     },
-    "lint": {
+    "eslint:lint": {
       "cache": true,
       "inputs": [
         "default"
+      ]
+    },
+    "@nx/js:tsc": {
+      "cache": true,
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "production",
+        "^production"
       ]
     }
   },
