@@ -5,6 +5,9 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Generated graph
+graph.json
+
 # NX cache
 .nx/
 
