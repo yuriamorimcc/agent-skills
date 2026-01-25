@@ -34,6 +34,7 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           registry-url: 'https://registry.npmjs.org'
+          scope: '@tech-leads-club'
           cache: 'npm'
 
       - run: npm ci
@@ -51,6 +52,12 @@ jobs:
           NPM_CONFIG_PROVENANCE: true
           NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
+      - name: Push Changes (Beta)
+        if: github.ref == 'refs/heads/beta' && success()
+        run: git push --atomic --follow-tags origin beta
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Release (Production)
         if: github.ref == 'refs/heads/main'
         run: npx nx release --yes
@@ -58,3 +65,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
           NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+
+      - name: Push Changes (Production)
+        if: github.ref == 'refs/heads/main' && success()
+        run: git push --atomic --follow-tags origin main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
