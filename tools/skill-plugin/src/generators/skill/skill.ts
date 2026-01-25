@@ -2,6 +2,8 @@ import { formatFiles, generateFiles, names, Tree } from '@nx/devkit'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
 
+import { SKILLS_ROOT_DIR } from '@tech-leads-club/core'
+
 import { assignSkillToCategory, categoryExists } from './category-utils'
 import { SkillGeneratorSchema } from './schema'
 
@@ -10,7 +12,7 @@ const __dirname = path.dirname(__filename)
 
 export async function skillGenerator(tree: Tree, options: SkillGeneratorSchema) {
   const normalizedNames = names(options.name)
-  const skillRoot = `skills/${normalizedNames.fileName}`
+  const skillRoot = `${SKILLS_ROOT_DIR}/${normalizedNames.fileName}`
 
   generateFiles(tree, path.join(__dirname, 'files'), skillRoot, {
     ...normalizedNames,
