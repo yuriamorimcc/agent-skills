@@ -1,13 +1,18 @@
 {
   "$schema": "https://raw.githubusercontent.com/nrwl/nx/master/packages/nx/schemas/nx-schema.json",
   "namedInputs": {
-    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "default": [
+      "{projectRoot}/**/*",
+      "sharedGlobals"
+    ],
     "sharedGlobals": [],
     "production": [
       "default",
       "!{projectRoot}/**/*.spec.ts",
       "!{projectRoot}/**/*.test.ts",
-      "!{projectRoot}/jest.config.ts"
+      "!{projectRoot}/jest.config.ts",
+      "!{projectRoot}/.eslintrc.json",
+      "!{projectRoot}/eslint.config.js"
     ]
   },
   "plugins": [
@@ -19,7 +24,10 @@
     }
   ],
   "release": {
-    "projects": ["@tech-leads-club/agent-skills", "core"],
+    "projects": [
+      "@tech-leads-club/agent-skills",
+      "core"
+    ],
     "version": {
       "conventionalCommits": true,
       "fallbackCurrentVersionResolver": "disk"
@@ -38,26 +46,47 @@
   },
   "targetDefaults": {
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "cache": true,
-      "inputs": ["production", "^production"]
+      "inputs": [
+        "production",
+        "^production"
+      ]
     },
     "nx-release-publish": {
-      "dependsOn": ["build"],
-      "inputs": ["production", "^production"]
+      "dependsOn": [
+        "build"
+      ],
+      "inputs": [
+        "production",
+        "^production"
+      ]
     },
     "test": {
       "cache": true,
-      "inputs": ["default", "^production"]
+      "inputs": [
+        "default",
+        "^production"
+      ]
     },
     "eslint:lint": {
       "cache": true,
-      "inputs": ["default"]
+      "inputs": [
+        "default",
+        "^production"
+      ]
     },
     "@nx/js:tsc": {
       "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "production",
+        "^production"
+      ]
     }
   },
   "defaultBase": "main",
