@@ -20,7 +20,6 @@
     ],
     "version": {
       "conventionalCommits": true,
-      "preVersionCommand": "npx nx run-many -t build",
       "fallbackCurrentVersionResolver": "disk"
     },
     "changelog": {
@@ -41,6 +40,15 @@
         "^build"
       ],
       "cache": true,
+      "inputs": [
+        "production",
+        "^production"
+      ]
+    },
+    "nx-release-publish": {
+      "dependsOn": [
+        "build"
+      ],
       "inputs": [
         "production",
         "^production"
