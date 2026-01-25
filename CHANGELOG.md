@@ -1,3 +1,68 @@
+## 0.1.0-beta.3 (2026-01-25)
+
+### 🚀 Features
+
+- add project configuration for CLI application ([1ee7ad5](https://github.com/tech-leads-club/agent-skills/commit/1ee7ad5))
+- enhance installer tests with global symlink handling ([b44be21](https://github.com/tech-leads-club/agent-skills/commit/b44be21))
+- add update check functionality for package versioning ([e034070](https://github.com/tech-leads-club/agent-skills/commit/e034070))
+- add update check and notification for global installation status ([9902b6a](https://github.com/tech-leads-club/agent-skills/commit/9902b6a))
+- implement global symlink handling for skill installation ([b45b92e](https://github.com/tech-leads-club/agent-skills/commit/b45b92e))
+- add global path utilities for skill management ([36f45e5](https://github.com/tech-leads-club/agent-skills/commit/36f45e5))
+- enhance skill installation prompts with installed skills indication ([54d1c85](https://github.com/tech-leads-club/agent-skills/commit/54d1c85))
+- enhance logo generation and improve prompt styling ([300cd08](https://github.com/tech-leads-club/agent-skills/commit/300cd08))
+- enhance agent installation detection for project root ([b7fca84](https://github.com/tech-leads-club/agent-skills/commit/b7fca84))
+- use project root for skill installation paths ([f27e81c](https://github.com/tech-leads-club/agent-skills/commit/f27e81c))
+- add function to find project root directory ([1cfe620](https://github.com/tech-leads-club/agent-skills/commit/1cfe620))
+- add commands for removing skills from installation ([5aace62](https://github.com/tech-leads-club/agent-skills/commit/5aace62))
+- add remove command for uninstalling skills ([a8be796](https://github.com/tech-leads-club/agent-skills/commit/a8be796))
+- enhance skill installation process with symlink and copy methods ([195ffa0](https://github.com/tech-leads-club/agent-skills/commit/195ffa0))
+- implement skill lock file management functions ([c8b6e1d](https://github.com/tech-leads-club/agent-skills/commit/c8b6e1d))
+- add detailed install result interface for better tracking ([0d48a0b](https://github.com/tech-leads-club/agent-skills/commit/0d48a0b))
+- enhance interactive installation process with skill selection ([f78ad10](https://github.com/tech-leads-club/agent-skills/commit/f78ad10))
+- add nx-release-publish configuration for improved build process ([17d0b61](https://github.com/tech-leads-club/agent-skills/commit/17d0b61))
+- enhance release workflow with Nx Cloud CI integration ([1d73e60](https://github.com/tech-leads-club/agent-skills/commit/1d73e60))
+- implement category management and skill assignment functionality ([7eb3bb2](https://github.com/tech-leads-club/agent-skills/commit/7eb3bb2))
+- add category property to skill schema for improved organization ([72b42be](https://github.com/tech-leads-club/agent-skills/commit/72b42be))
+- add category assignment functionality to skill generator ([24af98f](https://github.com/tech-leads-club/agent-skills/commit/24af98f))
+- enhance skill generator tests for category assignment and formatting ([dd80b6c](https://github.com/tech-leads-club/agent-skills/commit/dd80b6c))
+- add category property to skill generator schema ([e6abe82](https://github.com/tech-leads-club/agent-skills/commit/e6abe82))
+- update skill root directory to use SKILLS_ROOT_DIR constant ([5c0fe22](https://github.com/tech-leads-club/agent-skills/commit/5c0fe22))
+- add category management functions for skill assignment ([6363d14](https://github.com/tech-leads-club/agent-skills/commit/6363d14))
+- add schema for skill categories configuration ([81e8f28](https://github.com/tech-leads-club/agent-skills/commit/81e8f28))
+- add categories and skills configuration for agent skills ([63e829a](https://github.com/tech-leads-club/agent-skills/commit/63e829a))
+- add unit tests for categories configuration and logic ([ca4e001](https://github.com/tech-leads-club/agent-skills/commit/ca4e001))
+- update skills directory logic and enhance skill discovery ([da1aff9](https://github.com/tech-leads-club/agent-skills/commit/da1aff9))
+- add function to format category names from IDs ([59e0632](https://github.com/tech-leads-club/agent-skills/commit/59e0632))
+- add interfaces for category and agent configurations ([855cdb3](https://github.com/tech-leads-club/agent-skills/commit/855cdb3))
+- add default category constants for skills management ([e567d17](https://github.com/tech-leads-club/agent-skills/commit/e567d17))
+- add exports for constants, types, and utils ([ab0373e](https://github.com/tech-leads-club/agent-skills/commit/ab0373e))
+- initialize core library with configuration and build setup ([b43c4bb](https://github.com/tech-leads-club/agent-skills/commit/b43c4bb))
+- add gradient styles and logging functions for UI components ([75fb2e5](https://github.com/tech-leads-club/agent-skills/commit/75fb2e5))
+- add logo generation and screen initialization functions ([359e6a2](https://github.com/tech-leads-club/agent-skills/commit/359e6a2))
+- implement blue select and confirm prompts with back navigation ([21b05e1](https://github.com/tech-leads-club/agent-skills/commit/21b05e1))
+- add truncate function for text length management ([70870b0](https://github.com/tech-leads-club/agent-skills/commit/70870b0))
+- add utility functions for agent options and installed skills ([f54e25c](https://github.com/tech-leads-club/agent-skills/commit/f54e25c))
+- add functions to display installation and removal results ([4606e3c](https://github.com/tech-leads-club/agent-skills/commit/4606e3c))
+- implement interactive skill removal process ([5ea69a4](https://github.com/tech-leads-club/agent-skills/commit/5ea69a4))
+- add function to display available skills with installation status ([c8896e1](https://github.com/tech-leads-club/agent-skills/commit/c8896e1))
+- implement interactive installation wizard for skills and agents ([3bdd983](https://github.com/tech-leads-club/agent-skills/commit/3bdd983))
+- add installation summary display for skills and agents ([13dc11f](https://github.com/tech-leads-club/agent-skills/commit/13dc11f))
+- add NX cloud ID ([fc55a0b](https://github.com/tech-leads-club/agent-skills/commit/fc55a0b))
+- add moduleNameMapper for core library path resolution ([aee0285](https://github.com/tech-leads-club/agent-skills/commit/aee0285))
+- add MIT License to the project ([507fb79](https://github.com/tech-leads-club/agent-skills/commit/507fb79))
+- use package version from package.json for CLI versioning ([cc23397](https://github.com/tech-leads-club/agent-skills/commit/cc23397))
+- add fallbackCurrentVersionResolver to version settings ([72d6f73](https://github.com/tech-leads-club/agent-skills/commit/72d6f73))
+- add step to derive SHAs for nx affected commands ([80728d5](https://github.com/tech-leads-club/agent-skills/commit/80728d5))
+- add nx plugin configuration to eslint settings ([842b6ff](https://github.com/tech-leads-club/agent-skills/commit/842b6ff))
+
+### 🩹 Fixes
+
+- correct rootDir configuration in TypeScript settings ([dbd2e43](https://github.com/tech-leads-club/agent-skills/commit/dbd2e43))
+
+### ❤️ Thank You
+
+- Felipe Rodrigues @felipfr
+
 ## 0.1.0-beta.2 (2026-01-25)
 
 ### 🚀 Features
