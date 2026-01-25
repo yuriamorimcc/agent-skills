@@ -280,5 +280,5 @@ export function showAvailableSkills() {
   }
 
   console.log(`${pc.blue(S_BAR)}`)
-  console.log(`${pc.blue(S_BAR_END)}  ${pc.dim('Run "npx @tlc/agent-skills" to install')}`)
+  console.log(`${pc.blue(S_BAR_END)}  ${pc.dim('Run "npx @tech-leads-club/agent-skills" to install')}`)
 }
