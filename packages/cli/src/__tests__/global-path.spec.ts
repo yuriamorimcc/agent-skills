@@ -1,8 +1,4 @@
 import { jest } from '@jest/globals'
-import { execSync } from 'child_process'
-import { existsSync } from 'fs'
-
-import { getGlobalSkillPath, getGlobalSkillsPath, getNpmGlobalRoot, isGloballyInstalled } from '../global-path'
 
 jest.unstable_mockModule('node:child_process', () => ({
   execSync: jest.fn(),
@@ -11,6 +7,11 @@ jest.unstable_mockModule('node:child_process', () => ({
 jest.unstable_mockModule('node:fs', () => ({
   existsSync: jest.fn(),
 }))
+
+const { execSync } = await import('node:child_process')
+const { existsSync } = await import('node:fs')
+const { getGlobalSkillPath, getGlobalSkillsPath, getNpmGlobalRoot, isGloballyInstalled } =
+  await import('../global-path')
 
 describe('global-path', () => {
   beforeEach(() => {
@@ -84,9 +85,6 @@ describe('global-path', () => {
 
     it('should return null when skill does not exist', () => {
       ;(execSync as jest.Mock).mockReturnValue('/home/user/.npm-global/lib/node_modules\n')
-      ;(existsSync as jest.Mock).mockImplementation((path) => {
-        return !String(path).includes('nonexistent-skill')
-      })
       ;(existsSync as jest.Mock).mockReturnValueOnce(true).mockReturnValueOnce(false)
       const result = getGlobalSkillPath('nonexistent-skill')
       expect(result).toBeNull()
