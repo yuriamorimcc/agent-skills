@@ -2,24 +2,27 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
 
 permissions:
   actions: read
   contents: read
 
 jobs:
-  build:
+  main:
+    name: Nx Affected CI
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          filter: tree:0
 
-      - uses: nrwl/nx-set-shas@v4
+      - name: Start Nx Cloud CI Run
+        run: npx nx-cloud start-ci-run
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
@@ -28,10 +31,13 @@ jobs:
 
       - run: npm ci
 
-      - name: Run affected lint, test, and build
-        run: npx nx affected -t lint,test,build
+      - name: Run Affected
+        run: npx nx affected -t lint test build --parallel=3
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
   validate-skills:
+    name: Validate Skills Structure
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +51,6 @@ jobs:
               exit 1
             fi
             
-            # Validate SKILL.md has frontmatter
             if ! head -1 "$skill/SKILL.md" | grep -q "^---"; then
               echo "❌ Missing frontmatter in $skill/SKILL.md"
               exit 1
