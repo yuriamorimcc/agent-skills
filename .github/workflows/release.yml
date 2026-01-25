@@ -14,12 +14,21 @@ permissions:
 
 jobs:
   release:
+    name: Release
     runs-on: ubuntu-latest
+    environment: production
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           filter: tree:0
+
+      - name: Start Nx Cloud CI Run
+        run: npx nx-cloud start-ci-run
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+        continue-on-error: true
 
       - uses: actions/setup-node@v4
         with:
@@ -28,7 +37,6 @@ jobs:
           cache: 'npm'
 
       - run: npm ci
-      - run: npm run build
 
       - name: Git Config
         run: |
@@ -40,13 +48,13 @@ jobs:
         run: npx nx release --yes --preid beta
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
       - name: Release (Production)
         if: github.ref == 'refs/heads/main'
         run: npx nx release --yes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
