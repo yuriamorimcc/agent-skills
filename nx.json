@@ -28,8 +28,7 @@
       "@tech-leads-club/agent-skills"
     ],
     "version": {
-      "conventionalCommits": true,
-      "currentVersionResolver": "disk"
+      "conventionalCommits": true
     },
     "changelog": {
       "automaticFromRef": true,
