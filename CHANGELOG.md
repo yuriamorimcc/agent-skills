@@ -1,3 +1,26 @@
+## 0.3.0 (2026-01-26)
+
+### 🚀 Features
+
+- add shebang to JavaScript output for CLI compatibility ([f2c9453](https://github.com/tech-leads-club/agent-skills/commit/f2c9453))
+- add self-healing CI step to automatically fix failed tasks ([155aa80](https://github.com/tech-leads-club/agent-skills/commit/155aa80))
+- add additional badges for downloads, contributors, and last commit ([f841df1](https://github.com/tech-leads-club/agent-skills/commit/f841df1))
+- add CI status check action to verify checks before proceeding ([deb4514](https://github.com/tech-leads-club/agent-skills/commit/deb4514))
+- add reusable setup action for Node.js and Nx Cloud environment ([d04deb3](https://github.com/tech-leads-club/agent-skills/commit/d04deb3))
+- add snapshot notification action for PR comments and labeling ([31b2ae5](https://github.com/tech-leads-club/agent-skills/commit/31b2ae5))
+- add action to validate skill structure and frontmatter ([9683006](https://github.com/tech-leads-club/agent-skills/commit/9683006))
+- restructure CI/CD pipeline for improved workflow and snapshot handling ([463104d](https://github.com/tech-leads-club/agent-skills/commit/463104d))
+- enhance GitHub App token handling in setup action ([6cdeede](https://github.com/tech-leads-club/agent-skills/commit/6cdeede))
+- implement GitHub App token generation for release process ([0194cdd](https://github.com/tech-leads-club/agent-skills/commit/0194cdd))
+
+### 🩹 Fixes
+
+- add missing nxCloudId in configuration ([664519d](https://github.com/tech-leads-club/agent-skills/commit/664519d))
+
+### ❤️ Thank You
+
+- Felipe Rodrigues @felipfr
+
 ## 0.2.0 (2026-01-25)
 
 ### 🚀 Features

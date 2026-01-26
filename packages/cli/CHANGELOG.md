@@ -1,3 +1,13 @@
+## 0.3.0 (2026-01-26)
+
+### 🚀 Features
+
+- add shebang to JavaScript output for CLI compatibility ([f2c9453](https://github.com/tech-leads-club/agent-skills/commit/f2c9453))
+
+### ❤️ Thank You
+
+- Felipe Rodrigues @felipfr
+
 ## 0.2.0 (2026-01-25)
 
 ### 🚀 Features
