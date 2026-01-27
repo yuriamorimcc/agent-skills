@@ -3,7 +3,7 @@
   <img src="https://img.shields.io/npm/dt/@tech-leads-club/agent-skills?style=flat-square&color=blue" alt="total downloads" />
   <img src="https://img.shields.io/npm/dm/@tech-leads-club/agent-skills?style=flat-square&color=blue" alt="monthly downloads" />
   <img src="https://img.shields.io/github/license/tech-leads-club/agent-skills?style=flat-square" alt="license" />
-  <img src="https://img.shields.io/github/actions/workflow/status/tech-leads-club/agent-skills/ci.yml?style=flat-square" alt="build status" />
+  <img src="https://img.shields.io/github/actions/workflow/status/tech-leads-club/agent-skills/release.yml?style=flat-square" alt="build status" />
 </p>
 
 <p align="center">
