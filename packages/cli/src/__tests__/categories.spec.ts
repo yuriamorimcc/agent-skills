@@ -3,17 +3,15 @@ import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { CategoriesConfig, CategoryInfo } from '../types'
+import type { CategoryInfo, CategoryMetadata } from '../types'
 
 describe('categories', () => {
   let tempDir: string
   let skillsDir: string
-  let categoriesFilePath: string
 
   beforeEach(async () => {
     tempDir = join(tmpdir(), `categories-test-${Date.now()}`)
     skillsDir = join(tempDir, 'skills')
-    categoriesFilePath = join(skillsDir, 'categories.json')
     await mkdir(skillsDir, { recursive: true })
   })
 
@@ -25,15 +23,16 @@ describe('categories', () => {
     }
   })
 
-  describe('CategoriesConfig type', () => {
+  describe('CategoryInfo type', () => {
     it('should have correct structure', () => {
-      const config: CategoriesConfig = {
-        categories: [{ id: 'test-category', name: 'Test Category', description: 'A test category', priority: 1 }],
-        skills: { 'test-skill': 'test-category' },
+      const category: CategoryInfo = {
+        id: 'test-category',
+        name: 'Test Category',
+        description: 'A test category',
+        priority: 1,
       }
-      expect(config.categories).toHaveLength(1)
-      expect(config.categories[0].id).toBe('test-category')
-      expect(config.skills['test-skill']).toBe('test-category')
+      expect(category.id).toBe('test-category')
+      expect(category.name).toBe('Test Category')
     })
 
     it('should allow optional fields', () => {
@@ -43,29 +42,39 @@ describe('categories', () => {
     })
   })
 
-  describe('categories.json structure', () => {
-    it('should parse valid categories.json', async () => {
-      const validConfig: CategoriesConfig = {
-        categories: [
-          { id: 'development', name: 'Development', priority: 1 },
-          { id: 'creation', name: 'Creation', priority: 2 },
-        ],
-        skills: { 'skill-a': 'development', 'skill-b': 'creation' },
+  describe('CategoryMetadata type', () => {
+    it('should map folder names to metadata', () => {
+      const metadata: CategoryMetadata = {
+        '(development)': { name: 'Development Tools', description: 'Skills for development', priority: 1 },
+        '(creation)': { name: 'Skill Creation', priority: 2 },
       }
-      await writeFile(categoriesFilePath, JSON.stringify(validConfig, null, 2))
-      const content = await import('node:fs').then((fs) => fs.readFileSync(categoriesFilePath, 'utf-8'))
-      const parsed = JSON.parse(content) as CategoriesConfig
-      expect(parsed.categories).toHaveLength(2)
-      expect(parsed.skills['skill-a']).toBe('development')
+      expect(metadata['(development)'].name).toBe('Development Tools')
+      expect(metadata['(creation)'].priority).toBe(2)
     })
 
-    it('should handle empty categories', async () => {
-      const emptyConfig: CategoriesConfig = { categories: [], skills: {} }
-      await writeFile(categoriesFilePath, JSON.stringify(emptyConfig, null, 2))
-      const content = await import('node:fs').then((fs) => fs.readFileSync(categoriesFilePath, 'utf-8'))
-      const parsed = JSON.parse(content) as CategoriesConfig
-      expect(parsed.categories).toHaveLength(0)
-      expect(Object.keys(parsed.skills)).toHaveLength(0)
+    it('should allow partial metadata', () => {
+      const metadata: CategoryMetadata = {
+        '(tools)': { name: 'Tools' },
+      }
+      expect(metadata['(tools)'].description).toBeUndefined()
+    })
+  })
+
+  describe('category folder naming convention', () => {
+    it('should use parentheses for category folders', () => {
+      const categoryIdToFolderName = (id: string) => `(${id})`
+      expect(categoryIdToFolderName('development')).toBe('(development)')
+      expect(categoryIdToFolderName('web-automation')).toBe('(web-automation)')
+    })
+
+    it('should extract category ID from folder name', () => {
+      const folderNameToCategoryId = (folder: string) => {
+        const match = folder.match(/^\(([a-z][a-z0-9-]*)\)$/)
+        return match ? match[1] : null
+      }
+      expect(folderNameToCategoryId('(development)')).toBe('development')
+      expect(folderNameToCategoryId('(web-automation)')).toBe('web-automation')
+      expect(folderNameToCategoryId('regular-folder')).toBeNull()
     })
   })
 
@@ -93,23 +102,30 @@ describe('categories', () => {
     })
   })
 
-  describe('skill to category mapping', () => {
-    it('should map skills to categories', () => {
-      const skillsMap: Record<string, string> = {
-        'spec-driven-dev': 'development',
-        'skill-creator': 'creation',
-        'subagent-creator': 'creation',
-      }
-      expect(skillsMap['spec-driven-dev']).toBe('development')
-      expect(skillsMap['skill-creator']).toBe('creation')
-      expect(skillsMap['nonexistent']).toBeUndefined()
+  describe('file-system based category discovery', () => {
+    it('should identify category folders by pattern', () => {
+      const isCategoryFolder = (name: string) => /^\([a-z][a-z0-9-]*\)$/.test(name)
+      expect(isCategoryFolder('(development)')).toBe(true)
+      expect(isCategoryFolder('(web-automation)')).toBe(true)
+      expect(isCategoryFolder('regular-folder')).toBe(false)
+      expect(isCategoryFolder('(UPPERCASE)')).toBe(false)
     })
 
-    it('should return uncategorized for unknown skills', () => {
-      const skillsMap: Record<string, string> = {}
-      const DEFAULT_CATEGORY_ID = 'uncategorized'
-      const getCategoryId = (skillName: string): string => skillsMap[skillName] ?? DEFAULT_CATEGORY_ID
-      expect(getCategoryId('unknown-skill')).toBe('uncategorized')
+    it('should create category folders correctly', async () => {
+      const categoryFolder = join(skillsDir, '(development)')
+      await mkdir(categoryFolder, { recursive: true })
+      const { readdirSync } = await import('node:fs')
+      const entries = readdirSync(skillsDir)
+      expect(entries).toContain('(development)')
+    })
+
+    it('should create skills inside category folders', async () => {
+      const categoryFolder = join(skillsDir, '(development)')
+      const skillFolder = join(categoryFolder, 'my-skill')
+      await mkdir(skillFolder, { recursive: true })
+      await writeFile(join(skillFolder, 'SKILL.md'), '---\nname: my-skill\n---\n# My Skill')
+      const { existsSync } = await import('node:fs')
+      expect(existsSync(join(skillFolder, 'SKILL.md'))).toBe(true)
     })
   })
 
@@ -147,7 +163,6 @@ describe('categories', () => {
       }
 
       const skills: TestSkill[] = [{ name: 'skill-a', category: 'development' }, { name: 'skill-b' }]
-
       const grouped = new Map<string, TestSkill[]>()
 
       for (const skill of skills) {
@@ -177,48 +192,33 @@ describe('categories', () => {
     })
   })
 
-  describe('addCategory logic', () => {
-    it('should not add duplicate categories', () => {
-      const categories: CategoryInfo[] = [{ id: 'existing', name: 'Existing' }]
-
-      const addCategory = (category: CategoryInfo): boolean => {
-        if (categories.some((c) => c.id === category.id)) return false
-        categories.push(category)
-        return true
+  describe('_category.json metadata', () => {
+    it('should parse metadata file correctly', async () => {
+      const metadataPath = join(skillsDir, '_category.json')
+      const metadata: CategoryMetadata = {
+        '(development)': {
+          name: 'Development Tools',
+          description: 'Skills for developers',
+          priority: 1,
+        },
       }
-
-      const result1 = addCategory({ id: 'new', name: 'New' })
-      const result2 = addCategory({ id: 'existing', name: 'Existing' })
-      expect(result1).toBe(true)
-      expect(result2).toBe(false)
-      expect(categories).toHaveLength(2)
+      await writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+      const { readFileSync } = await import('node:fs')
+      const content = readFileSync(metadataPath, 'utf-8')
+      const parsed = JSON.parse(content) as CategoryMetadata
+      expect(parsed['(development)'].name).toBe('Development Tools')
+      expect(parsed['(development)'].priority).toBe(1)
     })
-  })
 
-  describe('assignSkillToCategory logic', () => {
-    it('should create new category when assigning to non-existent', () => {
-      const config: CategoriesConfig = { categories: [], skills: {} }
-
-      const assignSkill = (skillName: string, categoryId: string, categoryName?: string): void => {
-        if (!config.categories.some((c) => c.id === categoryId)) {
-          config.categories.push({
-            id: categoryId,
-            name:
-              categoryName ??
-              categoryId
-                .split('-')
-                .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                .join(' '),
-            priority: config.categories.length + 1,
-          })
-        }
-        config.skills[skillName] = categoryId
-      }
-
-      assignSkill('new-skill', 'new-category', 'New Category')
-      expect(config.categories).toHaveLength(1)
-      expect(config.categories[0].id).toBe('new-category')
-      expect(config.skills['new-skill']).toBe('new-category')
+    it('should work without metadata file', () => {
+      const formatCategoryName = (id: string) =>
+        id
+          .split('-')
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' ')
+      const categoryId = 'web-automation'
+      const displayName = formatCategoryName(categoryId)
+      expect(displayName).toBe('Web Automation')
     })
   })
 })
