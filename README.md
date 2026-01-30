@@ -302,6 +302,14 @@ Releases are automated via GitHub Actions when merging to `main`.
 
 ---
 
+## 🛡️ Content & Authorship
+
+This repository is a collection of curated skills intended to benefit the community. We deeply respect the intellectual property and wishes of all creators.
+
+If you are the author of any content included here and would like it **removed** or **updated**, please [open an issue](https://github.com/tech-leads-club/agent-skills/issues/new) or contact the maintainers. We will address your request immediately.
+
+---
+
 ## 📄 License
 
 MIT © [Tech Leads Club](https://github.com/tech-leads-club)
