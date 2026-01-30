@@ -8,48 +8,39 @@ import { addSkillToLock, removeSkillFromLock } from './lockfile'
 import { findProjectRoot } from './project-root'
 import type { AgentType, InstallOptions, InstallResult, SkillInfo } from './types'
 
-const AGENTS_SKILLS_DIR = join('.agents', 'skills')
-const EXCLUDE_FILES = new Set(['README.md', 'metadata.json', 'SKILL.md'])
+const CANONICAL_SKILLS_DIR = join('.agents', 'skills')
 
-function sanitizeName(name: string): string {
-  let sanitized = name.replace(/[/\\]/g, '')
-  sanitized = sanitized.replace(/[\0:]/g, '')
-  sanitized = sanitized.replace(/^[.\s]+|[.\s]+$/g, '')
-  sanitized = sanitized.replace(/^\.+/, '')
-  if (!sanitized || sanitized.length === 0) sanitized = 'unnamed-skill'
-  return sanitized.substring(0, 255)
+type InstallMode = 'symlink-global' | 'symlink-local' | 'copy-global' | 'copy-local'
+
+interface InstallContext {
+  skill: SkillInfo
+  config: ReturnType<typeof getAgentConfig>
+  safeSkillName: string
+  skillTargetPath: string
+  projectRoot: string
 }
 
-function isPathSafe(basePath: string, targetPath: string): boolean {
+const sanitizeName = (name: string): string => {
+  const sanitized = name
+    .replace(/[/\\]/g, '')
+    .replace(/[\0:]/g, '')
+    .replace(/^[.\s]+|[.\s]+$/g, '')
+    .replace(/^\.+/, '')
+
+  return (sanitized || 'unnamed-skill').substring(0, 255)
+}
+
+const isPathSafe = (basePath: string, targetPath: string): boolean => {
   const normalizedBase = normalize(resolve(basePath))
   const normalizedTarget = normalize(resolve(targetPath))
   return normalizedTarget.startsWith(normalizedBase + sep) || normalizedTarget === normalizedBase
 }
 
-async function createSymlink(target: string, linkPath: string): Promise<boolean> {
+const createSymlink = async (target: string, linkPath: string): Promise<boolean> => {
   try {
-    try {
-      const stats = await lstat(linkPath)
-      if (stats.isSymbolicLink()) {
-        const existingTarget = await readlink(linkPath)
-        if (resolve(existingTarget) === resolve(target)) return true
-        await rm(linkPath)
-      } else {
-        await rm(linkPath, { recursive: true })
-      }
-    } catch (err: unknown) {
-      if ((err as { code?: string })?.code === 'ELOOP') {
-        try {
-          await rm(linkPath, { force: true })
-        } catch {
-          // ignore
-        }
-      }
-    }
-
-    const linkDir = join(linkPath, '..')
-    await mkdir(linkDir, { recursive: true })
-    const relativePath = relative(linkDir, target)
+    await cleanExistingPath(linkPath, target)
+    await mkdir(join(linkPath, '..'), { recursive: true })
+    const relativePath = relative(join(linkPath, '..'), target)
     const type = platform() === 'win32' ? 'junction' : undefined
     await symlink(relativePath, linkPath, type)
     return true
@@ -58,26 +49,130 @@ async function createSymlink(target: string, linkPath: string): Promise<boolean>
   }
 }
 
-async function copyDirectory(src: string, dest: string): Promise<void> {
-  await mkdir(dest, { recursive: true })
-  const entries = await readdir(src, { withFileTypes: true })
-
-  for (const entry of entries) {
-    if (EXCLUDE_FILES.has(entry.name) || entry.name.startsWith('_')) continue
-    const srcPath = join(src, entry.name)
-    const destPath = join(dest, entry.name)
-
-    if (entry.isDirectory()) {
-      await copyDirectory(srcPath, destPath)
+const cleanExistingPath = async (linkPath: string, target: string): Promise<void> => {
+  try {
+    const stats = await lstat(linkPath)
+    if (stats.isSymbolicLink()) {
+      const existingTarget = await readlink(linkPath)
+      if (resolve(existingTarget) === resolve(target)) return
+      await rm(linkPath)
     } else {
-      await cp(srcPath, destPath)
+      await rm(linkPath, { recursive: true })
+    }
+  } catch (err: unknown) {
+    if ((err as { code?: string })?.code === 'ELOOP') {
+      await rm(linkPath, { force: true }).catch(() => {})
     }
   }
 }
 
-export async function installSkills(skills: SkillInfo[], options: InstallOptions): Promise<InstallResult[]> {
-  const results: InstallResult[] = []
+const copySkillDirectory = async (src: string, dest: string): Promise<void> => {
+  await rm(dest, { recursive: true, force: true })
+  await cp(src, dest, { recursive: true })
+}
+
+const getInstallMode = (method: 'symlink' | 'copy', global: boolean): InstallMode =>
+  `${method}-${global ? 'global' : 'local'}` as InstallMode
+
+const createSuccessResult = (
+  ctx: InstallContext,
+  method: 'symlink' | 'copy',
+  extras: Partial<InstallResult> = {},
+): InstallResult => ({
+  agent: ctx.config.displayName,
+  skill: ctx.skill.name,
+  path: ctx.skillTargetPath,
+  method,
+  success: true,
+  ...extras,
+})
+
+const createErrorResult = (ctx: InstallContext, method: 'symlink' | 'copy', error: unknown): InstallResult => ({
+  agent: ctx.config.displayName,
+  skill: ctx.skill.name,
+  path: ctx.skillTargetPath,
+  method,
+  success: false,
+  error: error instanceof Error ? error.message : String(error),
+})
+
+const installHandlers: Record<InstallMode, (ctx: InstallContext) => Promise<InstallResult>> = {
+  'symlink-global': async (ctx) => {
+    const globalSkillPath = getGlobalSkillPath(ctx.skill.name)
+    const symlinkTarget = globalSkillPath || ctx.skill.path
+
+    if (await createSymlink(symlinkTarget, ctx.skillTargetPath)) {
+      return createSuccessResult(ctx, 'symlink', { usedGlobalSymlink: !!globalSkillPath })
+    }
+
+    await copySkillDirectory(ctx.skill.path, ctx.skillTargetPath)
+    return createSuccessResult(ctx, 'copy', { symlinkFailed: true })
+  },
+
+  'symlink-local': async (ctx) => {
+    const canonicalDir = join(ctx.projectRoot, CANONICAL_SKILLS_DIR, ctx.safeSkillName)
+    await copySkillDirectory(ctx.skill.path, canonicalDir)
+
+    if (await createSymlink(canonicalDir, ctx.skillTargetPath)) {
+      return createSuccessResult(ctx, 'symlink', { usedGlobalSymlink: false })
+    }
+
+    await copySkillDirectory(ctx.skill.path, ctx.skillTargetPath)
+    return createSuccessResult(ctx, 'copy', { symlinkFailed: true })
+  },
+
+  'copy-global': async (ctx) => {
+    await copySkillDirectory(ctx.skill.path, ctx.skillTargetPath)
+    return createSuccessResult(ctx, 'copy')
+  },
+
+  'copy-local': async (ctx) => {
+    await copySkillDirectory(ctx.skill.path, ctx.skillTargetPath)
+    return createSuccessResult(ctx, 'copy')
+  },
+}
+
+const validatePath = (
+  targetDir: string,
+  skillTargetPath: string,
+  projectRoot: string,
+  global: boolean,
+): string | null => {
+  if (global) return null
+  if (isPathSafe(targetDir, skillTargetPath)) return null
+  if (isPathSafe(projectRoot, skillTargetPath)) return null
+  return 'Security: Invalid skill destination path'
+}
+
+const installSkillForAgent = async (
+  skill: SkillInfo,
+  agent: AgentType,
+  targetDir: string,
+  method: 'symlink' | 'copy',
+  projectRoot: string,
+  global: boolean,
+): Promise<InstallResult> => {
+  const config = getAgentConfig(agent)
+  const safeSkillName = sanitizeName(skill.name)
+  const skillTargetPath = join(targetDir, safeSkillName)
+  const ctx: InstallContext = { skill, config, safeSkillName, skillTargetPath, projectRoot }
+  const validationError = validatePath(targetDir, skillTargetPath, projectRoot, global)
+
+  if (validationError) {
+    return createErrorResult(ctx, method, validationError)
+  }
+
+  try {
+    const mode = getInstallMode(method, global)
+    return await installHandlers[mode](ctx)
+  } catch (error) {
+    return createErrorResult(ctx, method, error)
+  }
+}
+
+export const installSkills = async (skills: SkillInfo[], options: InstallOptions): Promise<InstallResult[]> => {
   const projectRoot = findProjectRoot()
+  const results: InstallResult[] = []
 
   for (const agent of options.agents) {
     const config = getAgentConfig(agent)
@@ -93,120 +188,23 @@ export async function installSkills(skills: SkillInfo[], options: InstallOptions
   return results
 }
 
-async function installSkillForAgent(
-  skill: SkillInfo,
-  agent: AgentType,
-  targetDir: string,
-  method: 'symlink' | 'copy',
-  projectRoot: string,
-  global: boolean,
-): Promise<InstallResult> {
-  const config = getAgentConfig(agent)
-  const safeSkillName = sanitizeName(skill.name)
-  const skillTargetPath = join(targetDir, safeSkillName)
-
-  if (!isPathSafe(targetDir, skillTargetPath) && !global) {
-    if (!isPathSafe(projectRoot, skillTargetPath) && !global) {
-      return {
-        agent: config.displayName,
-        skill: skill.name,
-        path: skillTargetPath,
-        method,
-        success: false,
-        error: 'Security: Invalid skill destination path',
-      }
-    }
-  }
-
-  try {
-    if (method === 'symlink') {
-      const globalSkillPath = getGlobalSkillPath(skill.name)
-
-      if (globalSkillPath) {
-        const success = await createSymlink(globalSkillPath, skillTargetPath)
-        if (success) {
-          return {
-            agent: config.displayName,
-            skill: skill.name,
-            path: skillTargetPath,
-            method,
-            success: true,
-            usedGlobalSymlink: true,
-          }
-        }
-      }
-
-      const canonicalDir = join(projectRoot, AGENTS_SKILLS_DIR, safeSkillName)
-      await mkdir(canonicalDir, { recursive: true })
-      await cp(skill.path, canonicalDir, { recursive: true })
-      const symlinkCreated = await createSymlink(canonicalDir, skillTargetPath)
-
-      if (!symlinkCreated) {
-        try {
-          await rm(skillTargetPath, { recursive: true, force: true })
-        } catch {
-          // ignore
-        }
-
-        await copyDirectory(skill.path, skillTargetPath)
-
-        return {
-          agent: config.displayName,
-          skill: skill.name,
-          path: skillTargetPath,
-          method: 'copy',
-          success: true,
-          symlinkFailed: true,
-        }
-      }
-
-      return {
-        agent: config.displayName,
-        skill: skill.name,
-        path: skillTargetPath,
-        method,
-        success: true,
-        usedGlobalSymlink: false,
-      }
-    } else {
-      await copyDirectory(skill.path, skillTargetPath)
-      return {
-        agent: config.displayName,
-        skill: skill.name,
-        path: skillTargetPath,
-        method,
-        success: true,
-      }
-    }
-  } catch (error) {
-    return {
-      agent: config.displayName,
-      skill: skill.name,
-      path: skillTargetPath,
-      method,
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    }
-  }
-}
-
-export async function listInstalledSkills(agent: AgentType, global: boolean): Promise<string[]> {
+export const listInstalledSkills = async (agent: AgentType, global: boolean): Promise<string[]> => {
   const config = getAgentConfig(agent)
   const targetDir = global ? config.globalSkillsDir : join(findProjectRoot(), config.skillsDir)
 
   try {
     const entries = await readdir(targetDir, { withFileTypes: true })
-    return entries.filter((entry) => entry.isDirectory() || entry.isSymbolicLink()).map((entry) => entry.name)
+    return entries.filter((e) => e.isDirectory() || e.isSymbolicLink()).map((e) => e.name)
   } catch {
     return []
   }
 }
 
-export async function isSkillInstalled(
+export const isSkillInstalled = async (
   skillName: string,
   agent: AgentType,
   options: { global?: boolean } = {},
-): Promise<boolean> {
+): Promise<boolean> => {
   const config = getAgentConfig(agent)
   const safeSkillName = sanitizeName(skillName)
   const targetBase = options.global ? config.globalSkillsDir : join(findProjectRoot(), config.skillsDir)
@@ -222,7 +220,7 @@ export async function isSkillInstalled(
   }
 }
 
-export function getInstallPath(skillName: string, agent: AgentType, options: { global?: boolean } = {}): string {
+export const getInstallPath = (skillName: string, agent: AgentType, options: { global?: boolean } = {}): string => {
   const config = getAgentConfig(agent)
   const safeSkillName = sanitizeName(skillName)
   const targetBase = options.global ? config.globalSkillsDir : join(findProjectRoot(), config.skillsDir)
@@ -235,50 +233,46 @@ export function getInstallPath(skillName: string, agent: AgentType, options: { g
   return installPath
 }
 
-export function getCanonicalPath(skillName: string, options: { global?: boolean } = {}): string {
+export const getCanonicalPath = (skillName: string, options: { global?: boolean } = {}): string => {
   const safeSkillName = sanitizeName(skillName)
   const baseDir = options.global ? homedir() : findProjectRoot()
-  const canonicalPath = join(baseDir, AGENTS_SKILLS_DIR, safeSkillName)
+  const canonicalPath = join(baseDir, CANONICAL_SKILLS_DIR, safeSkillName)
 
-  if (!isPathSafe(join(baseDir, AGENTS_SKILLS_DIR), canonicalPath)) {
+  if (!isPathSafe(join(baseDir, CANONICAL_SKILLS_DIR), canonicalPath)) {
     throw new Error('Invalid skill name: potential path traversal detected')
   }
 
   return canonicalPath
 }
 
-export async function removeSkill(
+export const removeSkill = async (
   skillName: string,
   agents: AgentType[],
   options: { global?: boolean } = {},
-): Promise<{ agent: string; success: boolean; error?: string }[]> {
-  const results: { agent: string; success: boolean; error?: string }[] = []
+): Promise<{ agent: string; success: boolean; error?: string }[]> => {
   const safeSkillName = sanitizeName(skillName)
   const projectRoot = findProjectRoot()
 
-  const canonicalPath = getCanonicalPath(skillName, options)
-  try {
-    await rm(canonicalPath, { recursive: true, force: true })
-  } catch {
-    // Ignore
-  }
+  await rm(getCanonicalPath(skillName, options), { recursive: true, force: true }).catch(() => {})
 
-  for (const agent of agents) {
-    const config = getAgentConfig(agent)
-    const targetDir = options.global ? config.globalSkillsDir : join(projectRoot, config.skillsDir)
-    const skillPath = join(targetDir, safeSkillName)
+  const results = await Promise.all(
+    agents.map(async (agent) => {
+      const config = getAgentConfig(agent)
+      const targetDir = options.global ? config.globalSkillsDir : join(projectRoot, config.skillsDir)
+      const skillPath = join(targetDir, safeSkillName)
 
-    try {
-      await rm(skillPath, { recursive: true, force: true })
-      results.push({ agent: config.displayName, success: true })
-    } catch (error) {
-      results.push({
-        agent: config.displayName,
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
+      try {
+        await rm(skillPath, { recursive: true, force: true })
+        return { agent: config.displayName, success: true }
+      } catch (error) {
+        return {
+          agent: config.displayName,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      }
+    }),
+  )
 
   await removeSkillFromLock(skillName)
   return results
