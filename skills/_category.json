@@ -1,7 +1,7 @@
 {
-  "(development)": {
-    "name": "Development",
-    "description": "Skills for software development workflows",
+  "(cloud)": {
+    "name": "Cloud & Infrastructure",
+    "description": "Skills for cloud management, AWS, and DevOps",
     "priority": 1
   },
   "(creation)": {
@@ -9,9 +9,14 @@
     "description": "Skills for creating new skills and subagents",
     "priority": 2
   },
+  "(development)": {
+    "name": "Development",
+    "description": "Skills for software development workflows",
+    "priority": 3
+  },
   "(web-automation)": {
     "name": "Web Automation",
     "description": "Skills for browser automation and web testing",
-    "priority": 3
+    "priority": 4
   }
 }
