@@ -6,7 +6,13 @@ import { isGloballyInstalled } from '../installer'
 import { discoverSkills } from '../skills'
 import type { AgentType, InstallOptions } from '../types'
 import { truncate } from '../ui/formatting'
-import { blueConfirm, blueMultiSelectWithBack, blueSelectWithBack, isCancelled } from '../ui/input'
+import {
+  blueConfirm,
+  blueGroupMultiSelect,
+  blueMultiSelectWithBack,
+  blueSelectWithBack,
+  isCancelled,
+} from '../ui/input'
 import { initScreen } from '../ui/screen'
 import { logBar, logBarEnd, logCancelled } from '../ui/styles'
 import { checkForUpdates, getCurrentVersion } from '../update-check'
@@ -14,21 +20,18 @@ import { showInstallationSummary } from './results'
 import { buildAgentOptions, getAllInstalledSkillNames } from './utils'
 
 type WizardState = {
-  category: string
   skills: string[]
   agents: AgentType[]
   method: 'symlink' | 'copy'
   global: boolean
 }
 
-const ALL_SKILLS_VALUE = '__all_skills__'
-const ALL_CATEGORIES_VALUE = '__all__'
-
 export async function runInteractiveInstall(): Promise<InstallOptions | null> {
   initScreen()
   await checkEnvironment()
 
   const allSkills = discoverSkills()
+
   if (allSkills.length === 0) {
     logBarEnd(pc.red('No skills available'))
     return null
@@ -40,7 +43,6 @@ export async function runInteractiveInstall(): Promise<InstallOptions | null> {
   const installedSkills = await getAllInstalledSkillNames(targetAgents)
 
   const state: WizardState = {
-    category: ALL_CATEGORIES_VALUE,
     skills: [],
     agents: installedAgents.length > 0 ? installedAgents : (['cursor', 'claude-code'] as AgentType[]),
     method: 'symlink',
@@ -48,7 +50,7 @@ export async function runInteractiveInstall(): Promise<InstallOptions | null> {
   }
 
   let currentStep = 1
-  const totalSteps = 4
+  const totalSteps = 3
 
   while (currentStep <= totalSteps) {
     const stepIndicator = pc.gray(`[${currentStep}/${totalSteps}]`)
@@ -56,35 +58,20 @@ export async function runInteractiveInstall(): Promise<InstallOptions | null> {
 
     switch (currentStep) {
       case 1: {
-        const result = await selectCategoryStep({ allSkills, stepIndicator, currentCategory: state.category })
+        const result = await selectSkillsUnifiedStep({
+          allSkills,
+          installedSkills,
+          stepIndicator,
+        })
+
         if (result === null) return null
-        state.category = result
+
+        state.skills = result
         currentStep++
         break
       }
 
       case 2: {
-        const result = await selectSkillsStep({
-          state,
-          allSkills,
-          installedSkills,
-          stepIndicator,
-          allowBack,
-        })
-
-        if (result === Symbol.for('back')) {
-          currentStep--
-          break
-        }
-
-        if (result === null) return null
-
-        state.skills = result as string[]
-        currentStep++
-        break
-      }
-
-      case 3: {
         const result = await selectAgentsStep({
           allAgents,
           installedAgents,
@@ -105,7 +92,7 @@ export async function runInteractiveInstall(): Promise<InstallOptions | null> {
         break
       }
 
-      case 4: {
+      case 3: {
         const result = await configureInstallationStep({
           state,
           stepIndicator,
@@ -150,102 +137,40 @@ async function checkEnvironment() {
   }
 }
 
-interface SelectCategoryProps {
-  allSkills: ReturnType<typeof discoverSkills>
-  stepIndicator: string
-  currentCategory: string
-}
-
-async function selectCategoryStep({
-  allSkills,
-  stepIndicator,
-  currentCategory,
-}: SelectCategoryProps): Promise<string | null> {
-  const groupedSkills = groupSkillsByCategory(allSkills)
-  const categoryList = Array.from(groupedSkills.keys())
-
-  const categoryOptions = [
-    { value: ALL_CATEGORIES_VALUE, label: `${pc.cyan('◉')} All skills`, hint: `${allSkills.length} available` },
-    ...categoryList.map((cat) => {
-      const skillCount = groupedSkills.get(cat)?.length ?? 0
-      return { value: cat.id, label: `${pc.cyan('▸')} ${cat.name}`, hint: `${skillCount} skill(s)` }
-    }),
-  ]
-
-  const selectedCategory = await blueSelectWithBack(
-    `${stepIndicator} Browse by category`,
-    categoryOptions,
-    currentCategory,
-    false,
-  )
-
-  if (isCancelled(selectedCategory)) {
-    logCancelled()
-    return null
-  }
-
-  return selectedCategory as string
-}
-
-interface SelectSkillsProps {
-  state: WizardState
+interface SelectSkillsUnifiedProps {
   allSkills: ReturnType<typeof discoverSkills>
   installedSkills: Set<string>
   stepIndicator: string
-  allowBack: boolean
 }
 
-async function selectSkillsStep({
-  state,
+async function selectSkillsUnifiedStep({
   allSkills,
   installedSkills,
   stepIndicator,
-  allowBack,
-}: SelectSkillsProps): Promise<string[] | symbol | null> {
-  const showAllCategories = state.category === ALL_CATEGORIES_VALUE
-  const filteredSkills = showAllCategories ? allSkills : allSkills.filter((skill) => skill.category === state.category)
+}: SelectSkillsUnifiedProps): Promise<string[] | null> {
+  const groupedSkills = groupSkillsByCategory(allSkills)
+  const options: Record<string, { value: string; label: string; hint?: string }[]> = {}
 
-  const skillOptions = [
-    {
-      value: ALL_SKILLS_VALUE,
-      label: `${pc.cyan('◉')} ${pc.bold('All Skills')}`,
-      hint: `select all ${filteredSkills.length} skills`,
-    },
-    ...filteredSkills.map((skill) => {
+  for (const [category, skills] of groupedSkills.entries()) {
+    options[category.name] = skills.map((skill) => {
       const isInstalled = installedSkills.has(skill.name)
       return {
         value: skill.name,
         label: isInstalled ? `${skill.name} ${pc.green('● installed')}` : skill.name,
         hint: truncate(skill.description, 150),
       }
-    }),
-  ]
+    })
+  }
 
-  const initialSkills = state.skills.length > 0 ? state.skills : []
+  const selectedSkills = await blueGroupMultiSelect(`${stepIndicator} Select skills to install`, options, [], false)
 
-  const selectedSkills = await blueMultiSelectWithBack(
-    `${stepIndicator} Select skills to install`,
-    skillOptions,
-    initialSkills,
-    allowBack,
-  )
-
-  if (selectedSkills === Symbol.for('back')) return Symbol.for('back')
+  if (selectedSkills === Symbol.for('back')) return null
 
   if (isCancelled(selectedSkills)) {
     logCancelled()
     return null
   }
-
-  const skillsArray = selectedSkills as string[]
-
-  const validSkills = skillsArray.includes(ALL_SKILLS_VALUE)
-    ? filteredSkills.map((s) => s.name)
-    : skillsArray.filter((s) => s !== ALL_SKILLS_VALUE)
-
-  if (validSkills.length === 0) logBar(pc.yellow('⚠ Please select at least one skill'))
-  if (validSkills.length === 0) return selectSkillsStep({ state, allSkills, installedSkills, stepIndicator, allowBack })
-  return validSkills
+  return selectedSkills as string[]
 }
 
 interface SelectAgentsProps {
