@@ -30,9 +30,11 @@
     ],
     "version": {
       "conventionalCommits": true,
+      "fallbackCurrentVersionResolver": "disk",
       "preVersionCommand": "npx nx run-many -t build --skip-nx-cache"
     },
     "changelog": {
+      "automaticFromRef": true,
       "projectChangelogs": true,
       "workspaceChangelog": {
         "createRelease": "github"
@@ -40,8 +42,7 @@
     },
     "git": {
       "commit": true,
-      "tag": true,
-      "baseBranch": "main"
+      "tag": true
     }
   },
   "targetDefaults": {
