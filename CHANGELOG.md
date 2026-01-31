@@ -1,3 +1,13 @@
+## 0.7.0 (2026-01-31)
+
+### 🚀 Features
+
+- add grouped multi-select functionality with headers ([a7812b2](https://github.com/tech-leads-club/agent-skills/commit/a7812b2))
+
+### ❤️ Thank You
+
+- Felipe Rodrigues @felipfr
+
 ## 0.6.0 (2026-01-31)
 
 ### 🚀 Features
