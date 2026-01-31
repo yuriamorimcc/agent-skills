@@ -39,9 +39,13 @@
             "glob": "**/*",
             "input": "skills",
             "output": "skills"
+          },
+          {
+            "glob": "package.json",
+            "input": ".",
+            "output": "."
           }
         ],
-        "generatePackageJson": true,
         "esbuildOptions": {
           "sourcemap": true,
           "outExtension": {
