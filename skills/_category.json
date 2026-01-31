@@ -14,9 +14,14 @@
     "description": "Skills for software development workflows",
     "priority": 3
   },
+  "(tooling)": {
+    "name": "Tooling",
+    "description": "Skills for tooling and utilities",
+    "priority": 4
+  },
   "(web-automation)": {
     "name": "Web Automation",
     "description": "Skills for browser automation and web testing",
-    "priority": 4
+    "priority": 5
   }
 }
