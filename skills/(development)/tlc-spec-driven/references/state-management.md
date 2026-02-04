@@ -74,3 +74,24 @@
 - Decisions have clear rationale?
 - Blockers include resolution path?
 - Learnings are actionable?
+
+---
+
+## Preferences
+
+Track user-facing behavioral state in STATE.md:
+
+```markdown
+## Preferences
+
+**Model Guidance Shown:** [ISO date or "never"]
+```
+
+**Update when:**
+
+| Event | Action |
+|-------|--------|
+| First model tip given | Set date |
+| User acknowledges/dismisses | Keep date (don't repeat) |
+
+This prevents repetitive suggestions while maintaining natural, helpful behavior.
