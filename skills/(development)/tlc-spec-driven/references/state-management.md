@@ -17,12 +17,14 @@
 ## Recent Decisions (Last 60 days)
 
 ### AD-[NNN]: [Decision title] ([date])
+
 **Decision:** [What was decided]
 **Reason:** [Why this choice]
 **Trade-off:** [What was sacrificed]
 **Impact:** [How this affects implementation]
 
 ### AD-[NNN]: [Decision title] ([date])
+
 [Same structure]
 
 ---
@@ -30,6 +32,7 @@
 ## Active Blockers
 
 ### B-[NNN]: [Blocker description]
+
 **Discovered:** [Date]
 **Impact:** [Severity and scope]
 **Workaround:** [Temporary solution if available]
@@ -40,6 +43,7 @@
 ## Lessons Learned
 
 ### L-[NNN]: [Learning description]
+
 **Context:** [Situation that occurred]
 **Problem:** [What went wrong]
 **Solution:** [How it was resolved]
@@ -48,12 +52,12 @@
 
 ## When to Update
 
-| Event | Action |
-|-------|--------|
-| Significant architectural choice | Add AD-[NNN] |
-| Implementation blocked | Add B-[NNN] |
-| Important discovery/learning | Add L-[NNN] |
-| Session end | Update "Last Updated" + "Current Work" |
+| Event                            | Action                                 |
+| -------------------------------- | -------------------------------------- |
+| Significant architectural choice | Add AD-[NNN]                           |
+| Implementation blocked           | Add B-[NNN]                            |
+| Important discovery/learning     | Add L-[NNN]                            |
+| Session end                      | Update "Last Updated" + "Current Work" |
 
 ## Size Management (Hybrid Strategy)
 
@@ -89,9 +93,9 @@ Track user-facing behavioral state in STATE.md:
 
 **Update when:**
 
-| Event | Action |
-|-------|--------|
-| First model tip given | Set date |
+| Event                       | Action                   |
+| --------------------------- | ------------------------ |
+| First model tip given       | Set date                 |
 | User acknowledges/dismisses | Keep date (don't repeat) |
 
 This prevents repetitive suggestions while maintaining natural, helpful behavior.

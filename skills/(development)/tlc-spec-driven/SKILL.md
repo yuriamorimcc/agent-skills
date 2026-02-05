@@ -22,7 +22,7 @@ Plan and implement projects with precision. Granular tasks. Clear dependencies. 
 .specs/
 ├── project/
 │   ├── PROJECT.md      # Vision & goals
-│   ├── ROADMAP.md      # Features & milestones  
+│   ├── ROADMAP.md      # Features & milestones
 │   └── STATE.md        # Memory between sessions
 ├── codebase/           # Brownfield analysis (existing projects)
 │   ├── STACK.md
@@ -41,11 +41,13 @@ Plan and implement projects with precision. Granular tasks. Clear dependencies. 
 ## Workflow
 
 **New project:**
+
 1. Initialize project → PROJECT.md
 2. Create roadmap → ROADMAP.md
 3. Specify features → existing workflow
 
 **Existing codebase:**
+
 1. Map codebase → 6 brownfield docs
 2. Initialize project → PROJECT.md + ROADMAP.md
 3. Specify features → existing workflow
@@ -53,17 +55,20 @@ Plan and implement projects with precision. Granular tasks. Clear dependencies. 
 ## Context Loading Strategy
 
 **Base load (~15k tokens):**
+
 - PROJECT.md (if exists)
 - ROADMAP.md (when planning/working on features)
 - STATE.md (persistent memory)
 
 **On-demand load:**
+
 - Codebase docs (when working in existing project)
 - spec.md (when working on specific feature)
 - design.md (when implementing from design)
 - tasks.md (when executing tasks)
 
 **Never load simultaneously:**
+
 - Multiple feature specs
 - Multiple architecture docs
 - Archived documents
