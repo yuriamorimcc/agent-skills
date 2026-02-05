@@ -6,6 +6,7 @@ export interface InstallOptions {
   agents: AgentType[]
   skills: string[]
   forceUpdate?: boolean
+  isUpdate?: boolean
 }
 
 export interface InstallResult {
