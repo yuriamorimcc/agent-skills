@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-02-05T18:42:17.000Z",
+  "generatedAt": "2026-02-05T21:01:52.429Z",
   "baseUrl": "https://cdn.jsdelivr.net/gh/tech-leads-club/agent-skills@main/packages/skills-catalog/skills",
   "categories": {
     "cloud": {
@@ -479,7 +479,6 @@
       "category": "development",
       "path": "(development)/docs-writer",
       "files": [
-        ".DS_Store",
         "SKILL.md",
         "references/style-guide.md"
       ]
@@ -594,7 +593,6 @@
       "category": "tooling",
       "path": "(tooling)/nx-workspace",
       "files": [
-        ".DS_Store",
         "SKILL.md",
         "reference/best-practices.md",
         "reference/ci-cd.md",
