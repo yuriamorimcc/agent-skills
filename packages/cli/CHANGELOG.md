@@ -1,3 +1,14 @@
+## 0.9.1 (2026-02-06)
+
+### 🩹 Fixes
+
+- remove unused global skills path functions ([be047f0](https://github.com/tech-leads-club/agent-skills/commit/be047f0))
+- remove unused global skill path retrieval in symlink handler ([5dfa447](https://github.com/tech-leads-club/agent-skills/commit/5dfa447))
+
+### ❤️ Thank You
+
+- Felipe Rodrigues @felipfr
+
 ## 0.9.0 (2026-02-06)
 
 ### 🚀 Features

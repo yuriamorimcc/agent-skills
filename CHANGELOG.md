@@ -1,3 +1,18 @@
+## 0.9.1 (2026-02-06)
+
+### 🚀 Features
+
+- add logo asset for branding ([2a8bf25](https://github.com/tech-leads-club/agent-skills/commit/2a8bf25))
+
+### 🩹 Fixes
+
+- remove unused global skill path retrieval in symlink handler ([5dfa447](https://github.com/tech-leads-club/agent-skills/commit/5dfa447))
+- remove unused global skills path functions ([be047f0](https://github.com/tech-leads-club/agent-skills/commit/be047f0))
+
+### ❤️ Thank You
+
+- Felipe Rodrigues @felipfr
+
 ## 0.9.0 (2026-02-06)
 
 ### 🚀 Features
