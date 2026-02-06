@@ -1,6 +1,6 @@
 import pc from 'picocolors'
 
-import { detectInstalledAgents, getAllAgentTypes } from '../agents'
+import { detectInstalledAgents, getAgentConfig, getAllAgentTypes } from '../agents'
 import { groupSkillsByCategory } from '../categories'
 import { isGloballyInstalled } from '../installer'
 import { discoverSkillsAsync } from '../skills-provider'
@@ -18,7 +18,13 @@ import { withSpinner } from '../ui/spinner'
 import { logBar, logBarEnd, logCancelled } from '../ui/styles'
 import { checkForUpdates, getCurrentVersion } from '../update-check'
 import { showInstallationSummary } from './results'
-import { buildAgentOptions, getAllInstalledSkillNames } from './utils'
+import {
+  buildAgentOptions,
+  getAllInstalledSkillNames,
+  getInstalledSkillsForAgents,
+  getUpdateConfigs,
+  type UpdateConfig,
+} from './utils'
 
 type WizardState = {
   skills: string[]
@@ -27,17 +33,17 @@ type WizardState = {
   global: boolean
 }
 
-type ActionType = 'install' | 'update' | 'both'
+type ActionType = 'install' | 'update'
 
 const WIZARD_STEPS = {
-  SKILLS: 1,
-  AGENTS: 2,
+  AGENTS: 1,
+  SKILLS: 2,
   CONFIG: 3,
 } as const
 
 const TOTAL_STEPS = Object.keys(WIZARD_STEPS).length
 
-export async function runInteractiveInstall(): Promise<InstallOptions | null> {
+export async function runInteractiveInstall(): Promise<InstallOptions | UpdateConfig[] | null> {
   initScreen()
   await checkEnvironment()
 
@@ -54,17 +60,21 @@ export async function runInteractiveInstall(): Promise<InstallOptions | null> {
   const installedSkills = await getAllInstalledSkillNames(targetAgents)
 
   if (installedSkills.size > 0) {
-    const earlyResult = await handleExistingSkills(installedSkills, [...installedAgents, ...allAgents])
-    if (earlyResult !== undefined) return earlyResult
+    const earlyResult = await handleExistingSkills(installedSkills, targetAgents)
+    if (earlyResult !== undefined) return earlyResult as InstallOptions | UpdateConfig[] | null
   }
+
+  // Filter to only include skills that exist in the skills-registry
+  const catalogSkillNames = new Set(allSkills.map((s) => s.name))
+  const validInstalledSkills = new Set([...installedSkills].filter((s) => catalogSkillNames.has(s)))
 
   return runWizard({
     allSkills,
     allAgents,
     installedAgents,
-    installedSkills,
-    shouldForceUpdate: installedSkills.size > 0,
-    preselectedSkills: installedSkills.size > 0 ? Array.from(installedSkills) : [],
+    installedSkills: validInstalledSkills,
+    shouldForceUpdate: validInstalledSkills.size > 0,
+    preselectedSkills: validInstalledSkills.size > 0 ? Array.from(validInstalledSkills) : [],
   })
 }
 
@@ -79,16 +89,22 @@ interface WizardParams {
 
 async function handleExistingSkills(
   installedSkills: Set<string>,
-  fallbackAgents: AgentType[],
-): Promise<InstallOptions | null | undefined> {
+  allAgents: AgentType[],
+): Promise<InstallOptions | UpdateConfig[] | null | undefined> {
   const action = await selectAction(installedSkills.size)
   if (action === null) return null
-  if (action === 'install' || action === 'both') return undefined
+  if (action === 'install') return undefined
 
-  const preselectedSkills = Array.from(installedSkills)
-  const defaultAgents: AgentType[] = fallbackAgents.length > 0 ? fallbackAgents : ['cursor', 'claude-code']
+  const updateConfigs = await getUpdateConfigs(allAgents)
 
-  showUpdatePreview(preselectedSkills)
+  if (updateConfigs.length === 0) {
+    logBarEnd(pc.yellow('No agents found with installed skills.'))
+    return null
+  }
+
+  const allSkills = updateConfigs.flatMap((c) => c.skills)
+  const uniqueSkills = [...new Set(allSkills)]
+  showUpdatePreview(uniqueSkills)
 
   const confirm = await blueConfirm('Proceed with update?', true)
   if (isCancelled(confirm) || !confirm) {
@@ -96,24 +112,17 @@ async function handleExistingSkills(
     return null
   }
 
-  return {
-    skills: preselectedSkills,
-    agents: defaultAgents,
-    method: 'symlink',
-    global: false,
-    forceUpdate: true,
-  }
+  return updateConfigs
 }
 
 async function selectAction(installedCount: number): Promise<ActionType | null> {
   const options = [
-    { value: 'install' as const, label: 'Install new skills', hint: 'browse and install new skills' },
+    { value: 'install' as const, label: 'Install / Update skills', hint: 'browse and select skills' },
     {
       value: 'update' as const,
-      label: `Update installed skills (${installedCount})`,
+      label: `Update all installed (${installedCount})`,
       hint: 're-download latest versions',
     },
-    { value: 'both' as const, label: 'Install new + Update existing', hint: 'do both at once' },
   ]
 
   const result = await blueSelectWithBack<ActionType>('What would you like to do?', options, 'install', false)
@@ -143,7 +152,7 @@ async function runWizard(params: WizardParams): Promise<InstallOptions | null> {
     global: false,
   }
 
-  let currentStep = WIZARD_STEPS.SKILLS
+  let currentStep = WIZARD_STEPS.AGENTS
 
   while (currentStep <= TOTAL_STEPS) {
     const stepResult = await executeStep({
@@ -157,15 +166,18 @@ async function runWizard(params: WizardParams): Promise<InstallOptions | null> {
     })
 
     if (stepResult === 'cancelled') return null
+
     if (stepResult === 'back') {
       currentStep--
       if (currentStep === WIZARD_STEPS.CONFIG - 1) state.method = 'symlink'
       continue
     }
+
     if (stepResult === 'restart') {
-      currentStep = WIZARD_STEPS.SKILLS
+      currentStep = WIZARD_STEPS.AGENTS
       continue
     }
+
     if (typeof stepResult === 'object') {
       if (shouldForceUpdate) stepResult.forceUpdate = true
       return stepResult
@@ -194,40 +206,43 @@ async function executeStep(ctx: StepContext): Promise<StepResult> {
   const allowBack = ctx.step > 1
 
   const stepHandlers: Record<number, () => Promise<StepResult>> = {
-    [WIZARD_STEPS.SKILLS]: () => handleSkillsStep(ctx, stepIndicator),
-    [WIZARD_STEPS.AGENTS]: () => handleAgentsStep(ctx, stepIndicator, allowBack),
+    [WIZARD_STEPS.AGENTS]: () => handleAgentsStep(ctx, stepIndicator),
+    [WIZARD_STEPS.SKILLS]: () => handleSkillsStep(ctx, stepIndicator, allowBack),
     [WIZARD_STEPS.CONFIG]: () => handleConfigStep(ctx, stepIndicator, allowBack),
   }
 
   return stepHandlers[ctx.step]()
 }
 
-async function handleSkillsStep(ctx: StepContext, stepIndicator: string): Promise<StepResult> {
-  const result = await selectSkillsUnifiedStep({
-    allSkills: ctx.allSkills,
-    installedSkills: ctx.installedSkills,
-    stepIndicator,
-    initialValues: ctx.preselectedSkills,
-  })
-
-  if (result === null) return 'cancelled'
-  ctx.state.skills = result
-  return 'next'
-}
-
-async function handleAgentsStep(ctx: StepContext, stepIndicator: string, allowBack: boolean): Promise<StepResult> {
+async function handleAgentsStep(ctx: StepContext, stepIndicator: string): Promise<StepResult> {
   const result = await selectAgentsStep({
     allAgents: ctx.allAgents,
     installedAgents: ctx.installedAgents,
     currentAgents: ctx.state.agents,
     stepIndicator,
+    allowBack: false,
+  })
+  if (result === null) return 'cancelled'
+  ctx.state.agents = result as AgentType[]
+  return 'next'
+}
+
+async function handleSkillsStep(ctx: StepContext, stepIndicator: string, allowBack: boolean): Promise<StepResult> {
+  const installedSkillsForAgents = await getInstalledSkillsForAgents(ctx.state.agents, ctx.allSkills)
+  const preselected = [...installedSkillsForAgents.keys()]
+
+  const result = await selectSkillsUnifiedStep({
+    allSkills: ctx.allSkills,
+    selectedAgents: ctx.state.agents,
+    installedSkillsMap: installedSkillsForAgents,
+    stepIndicator,
+    initialValues: preselected,
     allowBack,
   })
 
   if (result === Symbol.for('back')) return 'back'
   if (result === null) return 'cancelled'
-
-  ctx.state.agents = result as AgentType[]
+  ctx.state.skills = result as string[]
   return 'next'
 }
 
@@ -237,11 +252,9 @@ async function handleConfigStep(ctx: StepContext, stepIndicator: string, allowBa
     stepIndicator,
     allowBack,
   })
-
   if (result === Symbol.for('back')) return 'back'
   if (result === null) return 'cancelled'
   if (result === false) return 'restart'
-
   return result as InstallOptions
 }
 
@@ -250,51 +263,54 @@ async function checkEnvironment(): Promise<void> {
   const latestVersion = await checkForUpdates(currentVersion)
 
   if (latestVersion) {
-    logBar(
+    console.log(
       `${pc.yellow('⚠')}  ${pc.yellow('Update available:')} ${pc.gray(currentVersion)} → ${pc.green(latestVersion)}`,
     )
-    logBar(`   ${pc.gray('Run: npm update -g @tech-leads-club/agent-skills')}`)
-    logBar()
+    console.log(`   ${pc.gray('Run: npm update -g @tech-leads-club/agent-skills')}`)
+    console.log()
     return
   }
 
   if (!isGloballyInstalled()) {
-    logBar(`${pc.yellow('⚠')}  ${pc.yellow('Not installed globally')}`)
-    logBar(`   ${pc.yellow("Skills won't auto-update. Install globally:")}`)
-    logBar(`   ${pc.yellow('npm i -g @tech-leads-club/agent-skills')}`)
-    logBar()
+    console.log(`${pc.yellow('💡')}  ${pc.yellow('Tip: Install globally for easier access:')}`)
+    console.log(`    ${pc.yellow('npm i -g @tech-leads-club/agent-skills')}`)
+    console.log()
   }
 }
 
 interface SelectSkillsUnifiedProps {
   allSkills: SkillInfo[]
-  installedSkills: Set<string>
+  selectedAgents: AgentType[]
+  installedSkillsMap: Map<string, AgentType[]>
   stepIndicator: string
   initialCursor?: number
   initialValues?: string[]
+  allowBack?: boolean
 }
 
 async function selectSkillsUnifiedStep({
   allSkills,
-  installedSkills,
+  selectedAgents,
+  installedSkillsMap,
   stepIndicator,
   initialCursor = 0,
   initialValues = [],
-}: SelectSkillsUnifiedProps): Promise<string[] | null> {
+  allowBack = false,
+}: SelectSkillsUnifiedProps): Promise<string[] | symbol | null> {
   const groupedSkills = groupSkillsByCategory(allSkills)
-  const options = buildSkillOptions(groupedSkills, installedSkills, initialValues)
+  const options = buildSkillOptions(groupedSkills, selectedAgents, installedSkillsMap, initialValues)
 
   const result = await blueGroupMultiSelect(
     `${stepIndicator} Select skills to install`,
     options,
     initialValues,
-    false,
+    allowBack,
     initialCursor,
   )
 
   const { value: selectedSkills, cursor: finalCursor } = result
 
-  if (selectedSkills === Symbol.for('back')) return null
+  if (selectedSkills === Symbol.for('back')) return Symbol.for('back')
   if (isCancelled(selectedSkills)) {
     logCancelled()
     return null
@@ -304,7 +320,14 @@ async function selectSkillsUnifiedStep({
 
   if (validSkills.length === 0) {
     logBar(pc.yellow('⚠ Please select at least one skill'))
-    return selectSkillsUnifiedStep({ allSkills, installedSkills, stepIndicator, initialCursor: finalCursor })
+    return selectSkillsUnifiedStep({
+      allSkills,
+      selectedAgents,
+      installedSkillsMap,
+      stepIndicator,
+      initialCursor: finalCursor,
+      allowBack,
+    })
   }
 
   return validSkills
@@ -312,16 +335,17 @@ async function selectSkillsUnifiedStep({
 
 function buildSkillOptions(
   groupedSkills: Map<{ name: string }, SkillInfo[]>,
-  installedSkills: Set<string>,
+  selectedAgents: AgentType[],
+  installedSkillsMap: Map<string, AgentType[]>,
   initialValues: string[],
 ): Record<string, { value: string; label: string; hint?: string }[]> {
   const options: Record<string, { value: string; label: string; hint?: string }[]> = {}
 
   for (const [category, skills] of groupedSkills.entries()) {
     options[category.name] = skills.map((skill) => {
-      const isInstalled = installedSkills.has(skill.name)
+      const installedInAgents = installedSkillsMap.get(skill.name) || []
       const isPreselected = initialValues.includes(skill.name)
-      const badge = isInstalled ? (isPreselected ? pc.yellow('● will update') : pc.green('● installed')) : ''
+      const badge = buildInstallBadge(installedInAgents, selectedAgents, isPreselected)
 
       return {
         value: skill.name,
@@ -332,6 +356,22 @@ function buildSkillOptions(
   }
 
   return options
+}
+
+function buildInstallBadge(
+  installedInAgents: AgentType[],
+  selectedAgents: AgentType[],
+  isPreselected: boolean,
+): string {
+  if (installedInAgents.length === 0) return ''
+  const agentNames = installedInAgents.map((a) => getAgentConfig(a).displayName)
+
+  if (installedInAgents.length === selectedAgents.length) {
+    return isPreselected ? pc.yellow('● all (update)') : pc.green('● all')
+  } else {
+    const agentList = agentNames.join(', ')
+    return isPreselected ? pc.yellow(`● ${agentList} (update)`) : pc.green(`● ${agentList}`)
+  }
 }
 
 interface SelectAgentsProps {
@@ -415,6 +455,7 @@ async function configureInstallationStep({
   )
 
   if (method === Symbol.for('back')) return Symbol.for('back')
+
   if (isCancelled(method)) {
     logCancelled()
     return null
@@ -430,6 +471,7 @@ async function configureInstallationStep({
   state.global = scope === 'global'
 
   const confirm = await blueConfirm(pc.white('Proceed with installation?'), true)
+
   if (isCancelled(confirm)) {
     logCancelled()
     return null
