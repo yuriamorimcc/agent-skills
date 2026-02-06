@@ -3,7 +3,7 @@ import { homedir, platform } from 'node:os'
 import { join, normalize, relative, resolve, sep } from 'node:path'
 
 import { getAgentConfig } from './agents'
-import { getGlobalSkillPath, isGloballyInstalled } from './global-path'
+import { isGloballyInstalled } from './global-path'
 import { addSkillToLock, removeSkillFromLock } from './lockfile'
 import { findProjectRoot } from './project-root'
 import type { AgentType, InstallOptions, InstallResult, SkillInfo } from './types'
@@ -98,11 +98,8 @@ const createErrorResult = (ctx: InstallContext, method: 'symlink' | 'copy', erro
 
 const installHandlers: Record<InstallMode, (ctx: InstallContext) => Promise<InstallResult>> = {
   'symlink-global': async (ctx) => {
-    const globalSkillPath = getGlobalSkillPath(ctx.skill.name)
-    const symlinkTarget = globalSkillPath || ctx.skill.path
-
-    if (await createSymlink(symlinkTarget, ctx.skillTargetPath)) {
-      return createSuccessResult(ctx, 'symlink', { usedGlobalSymlink: !!globalSkillPath })
+    if (await createSymlink(ctx.skill.path, ctx.skillTargetPath)) {
+      return createSuccessResult(ctx, 'symlink')
     }
 
     await copySkillDirectory(ctx.skill.path, ctx.skillTargetPath)
