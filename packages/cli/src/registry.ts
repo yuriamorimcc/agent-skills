@@ -1,3 +1,4 @@
+import ky from 'ky'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -38,7 +39,10 @@ interface CachedRegistry {
 const CONFIG = {
   cliVersion: pkg.version,
   cacheTtlMs: 24 * 60 * 60 * 1000,
-  fetchTimeoutMs: 10_000,
+  fetchTimeoutMs: 15_000,
+  maxRetries: 3,
+  retryBaseDelayMs: 500,
+  maxConcurrentDownloads: 10,
   defaultCategoryPriority: 999,
 } as const
 
@@ -53,15 +57,26 @@ const PATHS = {
 } as const
 
 const URLS = {
+  get cdnRef() {
+    return process.env.SKILLS_CDN_REF ?? `v${CONFIG.cliVersion}`
+  },
   get cdnBase() {
-    const ref = process.env.SKILLS_CDN_REF ?? `v${CONFIG.cliVersion}`
-    return `https://cdn.jsdelivr.net/gh/tech-leads-club/agent-skills@${ref}`
+    return `https://cdn.jsdelivr.net/gh/tech-leads-club/agent-skills@${this.cdnRef}`
+  },
+  get fallbackCdnBase() {
+    return `https://raw.githubusercontent.com/tech-leads-club/agent-skills/${this.cdnRef}`
   },
   get registry() {
     return `${this.cdnBase}/packages/skills-catalog/skills-registry.json`
   },
+  get fallbackRegistry() {
+    return `${this.fallbackCdnBase}/packages/skills-catalog/skills-registry.json`
+  },
   get skillsBase() {
     return `${this.cdnBase}/packages/skills-catalog/skills`
+  },
+  get fallbackSkillsBase() {
+    return `${this.fallbackCdnBase}/packages/skills-catalog/skills`
   },
 } as const
 
@@ -91,14 +106,33 @@ function saveRegistryToCache(registry: SkillsRegistry): void {
   writeFileSync(PATHS.registryCacheFile, JSON.stringify(cached, null, 2))
 }
 
-async function fetchWithTimeout(url: string, timeoutMs = CONFIG.fetchTimeoutMs): Promise<Response> {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+const httpClient = ky.create({
+  timeout: CONFIG.fetchTimeoutMs,
+  retry: {
+    limit: CONFIG.maxRetries,
+    methods: ['get'],
+    statusCodes: [408, 429, 500, 502, 503, 504],
+    backoffLimit: 10_000,
+    delay: (attemptCount) => CONFIG.retryBaseDelayMs * Math.pow(2, attemptCount - 1),
+    jitter: true,
+    retryOnTimeout: true,
+  },
+})
 
+async function fetchWithFallback(url: string, fallbackUrl?: string): Promise<Response> {
   try {
-    return await fetch(url, { signal: controller.signal })
-  } finally {
-    clearTimeout(timeoutId)
+    return await httpClient.get(url)
+  } catch (error) {
+    // Try fallback URL if primary failed
+    if (fallbackUrl) {
+      try {
+        return await httpClient.get(fallbackUrl)
+      } catch {
+        // Fallback also failed, ignore and throw original error
+      }
+    }
+
+    throw error
   }
 }
 
@@ -111,8 +145,7 @@ export async function fetchRegistry(forceRefresh = false): Promise<SkillsRegistr
   }
 
   try {
-    const response = await fetchWithTimeout(URLS.registry)
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const response = await fetchWithFallback(URLS.registry, URLS.fallbackRegistry)
 
     const registry = (await response.json()) as SkillsRegistry
     saveRegistryToCache(registry)
@@ -160,12 +193,10 @@ async function downloadSkillFile(skill: SkillMetadata, file: string, skillCacheP
 
   const parentDir = join(filePath, '..')
   if (!existsSync(parentDir)) mkdirSync(parentDir, { recursive: true })
-
   const fileUrl = `${URLS.skillsBase}/${skill.path}/${file}`
-  const response = await fetchWithTimeout(fileUrl)
-
+  const fallbackUrl = `${URLS.fallbackSkillsBase}/${skill.path}/${file}`
+  const response = await fetchWithFallback(fileUrl, fallbackUrl)
   if (!response.ok) throw new Error(`Failed to download ${file}: HTTP ${response.status}`)
-
   writeFileSync(filePath, await response.text())
   return true
 }
@@ -177,7 +208,19 @@ export async function downloadSkill(skill: SkillMetadata): Promise<string | null
   if (!existsSync(skillCachePath)) mkdirSync(skillCachePath, { recursive: true })
 
   try {
-    await Promise.all(skill.files.map((file) => downloadSkillFile(skill, file, skillCachePath)))
+    const files = [...skill.files]
+    let downloadedCount = 0
+
+    for (let i = 0; i < files.length; i += CONFIG.maxConcurrentDownloads) {
+      const batch = files.slice(i, i + CONFIG.maxConcurrentDownloads)
+      const results = await Promise.all(batch.map((file) => downloadSkillFile(skill, file, skillCachePath)))
+      downloadedCount += results.filter(Boolean).length
+    }
+
+    if (downloadedCount < files.length) {
+      throw new Error(`Only ${downloadedCount}/${files.length} files downloaded successfully`)
+    }
+
     return skillCachePath
   } catch (error) {
     console.error(`Failed to download skill ${skill.name}: ${error instanceof Error ? error.message : error}`)
